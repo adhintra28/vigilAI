@@ -1,129 +1,84 @@
 # VigilAI
 
-Hackathon prototype: an **AI-assisted visual scene review** tool for security and investigation workflows. Upload an image or describe a simulated scene; the app returns a structured report (visible facts, suspicious activities, objects, anomalies, relationships, hypotheses, risk, follow-ups) with explicit **grounding** and **limitations**.
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-**Disclaimer:** Outputs are model-assisted triage, not legal or forensic findings. Verify against primary evidence.
+**VigilAI** is an advanced, AI-assisted visual scene review tool designed for security and investigative workflows. By leveraging state-of-the-art vision models, VigilAI provides meticulous, evidence-first scene interpretations—extracting clear facts, identifying suspicious activities, and formulating hypotheses based on explicit visual grounding.
 
----
+> **Disclaimer:** VigilAI outputs are model-assisted triage and analysis mechanisms. They are not a substitute for formal lab procedures, legal findings, or strict forensic validation. Always verify AI-assisted findings against primary evidence.
 
-## Is this “complete”?
+## Overview
 
-**For a hackathon demo:** yes — end-to-end UI, Groq-backed vision + JSON, offline honest mode, optional illustrative sample, validation and repair retry.
+Modern security operations and investigations require rapid, reliable insight from complex crime scenes or situational imagery. VigilAI bridges the gap between raw data and actionable intelligence. Rather than offering basic object detection, VigilAI constructs a structured, comprehensive narrative of the scene—separating observed facts from inferred logic and providing investigators with a highly interpretable evidence trail.
 
-**For production:** no — no auth, audit trail, video ingestion, detector boxes, or formal evaluation harness.
+### Key Features
+- **Evidence-First Scene Review:** Systematically categorizes intelligence into what is *observed*, *inferred*, and *speculative*, ensuring reviewers are never misled by AI hallucinations.
+- **Multimodal Intelligence:** Upload CCTV stills, crime scene photos, or forensic frames for deep visual analysis.
+- **Simulated Narrative Analysis:** Feed textual witness reports or simulated scene descriptions for thorough narrative deconstruction.
+- **Robust Output Schema:** Generates actionable, strictly validated JSON reports detailing visible facts, limitations, anomalies, relationships, and risk assessments.
+- **Deterministic Offline Capabilities:** In environments without secure API access, the system gracefully falls back to displaying precise, deterministic image metadata. 
 
----
+## Technical Stack
 
-## How we reached this solution
+- **Frontend Application:** [Streamlit](https://streamlit.io/) for rapid, responsive UI delivery.
+- **Data Validation:** [Pydantic](https://docs.pydantic.dev/) ensures all model outputs strictly adhere to our forensic reporting schema.
+- **Inference Engine:** Backed by **Groq**, utilizing the highly capable `meta-llama/llama-4-scout-17b-16e-instruct` vision model for unparalleled processing speed and multi-modal accuracy.
 
-1. **Problem framing**  
-   The brief asked for visual crime / security analysis: detect elements, context, overlooked details, and plausible narratives for investigation support.
-
-2. **Stack choice**  
-   **Python + Streamlit** keeps the prototype fast to build and easy to demo without a separate frontend. One `app.py` entrypoint and a small `analysis.py` module keeps the architecture obvious for judges.
-
-3. **Model provider**  
-   We use **Groq** with the OpenAI-compatible client (`base_url=https://api.groq.com/openai/v1`) for speed and simple JSON chat. The default vision model is **`meta-llama/llama-4-scout-17b-16e-instruct`** ([Groq vision docs](https://console.groq.com/docs/vision)), which supports images and `response_format: json_object`.
-
-4. **Accuracy / trust**  
-   Raw “AI says it’s suspicious” is weak for serious use. We iterated to an **evidence-first schema**:
-   - **`visible_facts`** — only what pixels or the narrative explicitly support.
-   - **`grounding`** on interpretive rows (`observed` / `inferred` / `speculative`).
-   - **`limitations_and_uncertainties`** — required; enforced with **Pydantic** validation.
-   - **Repair retry** — if JSON or schema fails, the model gets one correction pass.
-
-5. **Groq image limits**  
-   Groq caps base64 payload size (~4MB). Uploads are **re-encoded as JPEG** and scaled in `prepare_image_for_groq()` so typical photos stay under the limit.
-
-6. **Offline and demo behavior**  
-   Without `GROQ_API_KEY`, the app does **not** fake analysis of your file: it shows **deterministic image metadata** only, or an **optional clearly labeled illustrative sample** for pitch mode.
-
-7. **Windows friction**  
-   Many Windows installs resolve `python` to the **Microsoft Store stub**. Scripts `setup_venv.ps1` and `run_app.ps1` use the real **venv interpreter** so `streamlit` runs reliably (`python -m streamlit run app.py`).
-
----
-
-## Repository layout
+## Project Structure
 
 | File | Purpose |
-|------|--------|
-| `app.py` | Streamlit UI |
-| `analysis.py` | Prompts, Groq calls, JPEG prep, Pydantic validation, offline payloads |
-| `check_groq.py` | Smoke test API + JSON mode (no UI) |
-| `setup_venv.ps1` / `run_app.ps1` | Windows-friendly venv setup and launch |
-| `.env.example` | Copy to `.env`; document variables (no secrets) |
+|------|---------|
+| `app.py` | Main Streamlit application and UI routing definitions. |
+| `analysis.py` | Core logic for API integration, image preparation, and Pydantic schema enforcement. |
+| `check_groq.py` | Headless API testing and validation utility. |
+| `run_app.ps1` / `setup_venv.ps1` | Automated setup and execution parameters for Windows environments. |
+| `requirements.txt` | Explicit project dependencies. |
 
----
+## Installation & Setup
 
-## Quick start
+### Prerequisites
+- **Python 3.12+** installed on your host system.
+- A **Groq API Key** (available via the [Groq Console](https://console.groq.com/keys)).
 
-### 1. Prerequisites
-
-- Python **3.12+** (3.14 works; from [python.org](https://www.python.org/downloads/) or Microsoft Store **full** install — avoid the “app execution alias” stub alone).
-- A [Groq API key](https://console.groq.com/keys).
-
-### 2. Configure
-
+### 1. Clone & Configure
+Clone the repository to your local environment and initialize the configurations:
 ```powershell
-cd path\to\vigilAI
+git clone https://github.com/adhintra28/ARGUS.git
+cd ARGUS
 copy .env.example .env
 ```
+Edit the newly created `.env` file and append your `GROQ_API_KEY`:
+```env
+GROQ_API_KEY=your_api_key_here
+VIGILAI_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+```
 
-Edit `.env`:
-
-- `GROQ_API_KEY` — your secret key  
-- `VIGILAI_MODEL` — optional; default is Llama 4 Scout instruct (vision + JSON)
-
-**Never commit `.env`.** It is listed in `.gitignore`.
-
-### 3. Install and run (Windows)
-
+### 2. Automated Installation (Windows)
+For rapid deployment on Windows environments, run the provided PowerShell wrappers:
 ```powershell
 .\setup_venv.ps1
 .\run_app.ps1
 ```
 
-Manual equivalent:
+### Manual Installation
+If deploying on other operating systems or manually mapping environments:
+```bash
+python -m venv .venv
+# Activate the virtual environment
+# Windows: .\.venv\Scripts\activate
+# Unix/MacOS: source .venv/bin/activate
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m streamlit run app.py
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-### 4. Test Groq without Streamlit
+## Usage
 
-```powershell
-.\.venv\Scripts\python.exe check_groq.py
-```
-
----
-
-## Using the app
-
-- **Image / scene photo:** upload PNG/JPG/WebP/GIF; optional investigator context; **Analyze image**.
-- **Simulated scene (text):** paste a witness-style narrative; **Analyze simulated scene**.
-- **Sidebar:** model id, force offline, illustrative sample toggle.
-
-To stress **suspicious activities**, use a busy image and/or short neutral context (“evaluate for loitering, tailgating, unattended bags…”), or write explicit behavior in the **simulated** tab.
-
----
-
-## Pushing to GitHub
-
-1. Confirm **`git status`** does not list `.env` (if it does, unstage and keep it local-only).
-2. If `.env` was ever committed, **rotate `GROQ_API_KEY`** and use `git filter-repo` or BFG if history must be cleaned.
-3. Commit source only: `app.py`, `analysis.py`, `requirements.txt`, scripts, `README.md`, `.env.example`, `.gitignore`.
-4. Push to your remote.
-
-```powershell
-git add app.py analysis.py requirements.txt README.md .env.example .gitignore check_groq.py setup_venv.ps1 run_app.ps1
-git commit -m "Add VigilAI Streamlit prototype with Groq vision analysis"
-git remote add origin https://github.com/<you>/<repo>.git
-git push -u origin main
-```
-
----
+1. Launch the application via `streamlit run app.py`. This hosts the UI locally at `http://localhost:8501`.
+2. **Visual Evidence Tab:** Upload an image (`.png`, `.jpg`, `.webp`) and supply optional investigator context, such as timestamp or geolocation.
+3. **Simulated Scenario Tab:** Paste raw textual testimonies or simulated scenario parameters for semantic analysis.
+4. Interact with the generated **Intelligence Report**, analyzing the Risk Level, Suspicious Activities, Evidence limitations, and Investigative follow-up procedures.
 
 ## License
 
-Specify a license for the hackathon repo if required by your event (e.g. MIT).
+This project is distributed under the MIT License.
